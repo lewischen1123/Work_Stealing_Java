@@ -1,0 +1,5 @@
+# eclipse specific git ignore
+.metadata
+.metadata/*
+
+
