@@ -1,0 +1,38 @@
+1) Loop transformations [Mon week 7]
+===
+To efficiently parallelise loops, we usually need to make sure that there are no dependences between the iterations. In some case we can transform a loop with inter-iteration dependences into a loop without such dependences. We saw the example of loop shifting in the lecture. Investigate what loop transformations exist, how they work and when they can be applied. Document that systematically. Implement a number of these loop transformations where you take as input a code snippet with a loop and output a transformed loop. You can use libraries and tools to help you do this. Try to implement this for Java as input and output. 
+
+
+2) Fast thread-safe priority queue in Java [Thu week 7]
+===
+Priority queues (PQ) are an important data structure. Due to their importance, the Java SDK provides PQ implementations (java.util.PriorityQueue). Often PQs are implemented as binary heaps, which are essentially binary trees implements in a flat array. There is also a thread safe implementation in the java.util.concurrent package (PriorityBlockingQueue), but its performance under the concurrent access of multiple threads is limited. Investigate which better thread-safe priority queues have been proposed (e.g. Pipelined PQ, lock-free PQ) and implement at least one such version. Your code can be based on the (Open Source) code of the existing (Priority)BlockingQueue. Compare the performance of your queue with PriorityBlockingQueue in a simple application benchmark.
+
+
+3) Work stealing algorithms [Mon week 8]
+===
+Parallel execution environments like ParaTask normally manage the tasks to be executed in one or multiple queues. For dynamic load balancing, these environments then often employ work stealing approaches, where a worker thread without tasks steals from the queues of busy worker threads. Investigate the different work stealing approaches and algorithms in literature. Important distinguishing points are: queue structures and organisation, victim selection, stolen chunk sizes etc. Implement your own work stealing algorithms in the ParaTask runtime and compare its performance to the built in algorithms using simple application benchmarks. 
+
+
+4) Performance visualisation tools for parallel programs [Thu week 8]
+===
+Parallel computing's objective is to improve the execution speed of a program. Sometimes it is very difficult to get good performance in a parallel program. Performance visualisation tools  (e.g. Jumpshot, VAMPIR, TAU, Virtue, ParaGraph, Intel Advisor (part of Parallel Studio)) try to help the programmer by visualisation the execution and behaviour of a parallel program, but showing what happens when in a parallel program, depicting threads/processors side by side on a timeline. Typically tools gather information during the execution of the program, a so called trace, and then render this trace visually in interactive tools. Investigate what visualisation tools are available and list their features. Instrumentalise the runtime of ParaTask to create trace files (an example instrumentalisation of ParaTask and hints will be provided). Execute simple example programs and visualise the traces using one of the tools. Use an open trace file format, e.g. PAJE.
+
+
+5) Parallel application based on NASA World Wind API [Mon week 9]
+===
+Using the NASA World Wind API, develop a cool Java desktop application that integrates some of the parallel programming concepts taught in class. You are free to decide the functionality and features of your application, or even integrate other APIs to create a novel application. Ultimately, you will be assessed on how well you integrate the parallel programming concepts taught, and tools (especially if you decide to use ParaTask or Parallel Iterator). There should be convincing usage of parallelism and concurrency, showing where parallelisation has genuinely helped the performance of your application. Bear in mind that this means whatever functionalities/features you provide, there needs to be a local computational aspect in order to justify the need for shared-memory parallel programming (i.e. you need to ensure that your application is not using multi-threading solely for concurrency -- there needs to be parallelisation also). 
+
+
+6) Lightweight MapReduce for shared memory system [Thu week 9]
+===
+MapReduce is a well-known approach in distributed systems to execute large data processing tasks in parallel. There are two phases. First, the data is divided and mapped to the processing nodes and executed there. Second, the distributed results are collected and reduced to a single results. Several frameworks have emerged to support such type of computation. When using a single shared memory system, however, they might suffer from overheads that are not necessary in such a system. Investigate different map-reduce patterns and implement your own map-reduce framework in Java based on the pattern that you believe is the most efficient. For the reduction part you will use the powerful reduction library RedLib. Compare the performance of your approach other Java based frameworks (e.g. Hadoop) on the same computer (e.g. multicore desktop. 
+
+
+7) Parallel video editing application [Mon week 10]
+===
+Develop a video editing application, that allows various filters to be performed on videos. The application needs to be developed as a Java desktop application, and it shows off parallelisation concepts (not just concurrency concepts) taught in class. You are free to use any backend APIs/libraries, but you need to ensure the application runs on Linux. You are free to incorporate any features or APIs you like, but you should demonstrate as many different parallelisation concepts as possible (e.g. computational tasks, multi-tasks, I/O tasks, dependences, scheduling policies). When applying filters on a video, it should give the user the option to save the video output. What about cancelling the processing? Are you going to break up the files into smaller pieces to do the processing? When is it worthwhile, when is it not? 
+
+
+8) Educational application to illustrate parallel programming concepts [Thu week 10]
+===
+Using Unity 3D, develop an educational application to explain parallel programming concepts of your choice. You may select ones covered in class, or extend to other parallel programming concepts. The application should be interactive for the user (to be engaging). You are free to decide the target audience (e.g. students studying a parallel computing course, or non-technical audience), but your application needs to clearly demonstrate how it caters for that audience. 
