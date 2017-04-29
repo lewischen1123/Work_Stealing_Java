@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<!-- saved from url=(0090)https://www.igvita.com/2012/02/29/work-stealing-and-recursive-partitioning-with-fork-join/ -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  
+  <title>Work-Stealing &amp; Recursive Partitioning with Fork/Join - igvita.com</title>
+
+  <script type="text/javascript" async="" src="./Work-Stealing &amp; Recursive Partitioning with Fork_Join - igvita.com_files/analytics.js.下载"></script><script>var dataLayer=dataLayer||[];dataLayer.push({'gtm.start':new Date().getTime(),event:'gtm.js'});</script>
+  <script src="./Work-Stealing &amp; Recursive Partitioning with Fork_Join - igvita.com_files/gtm.js.下载" async="" defer=""></script>
+
+  <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin="">
+  <style>/* cyrillic-ext */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Open Sans'), local('OpenSans'), url(https://fonts.gstatic.com/s/opensans/v13/K88pR3goAWT7BTt32Z01mxJtnKITppOI_IvcXXDNrsc.woff2) format('woff2');
+  unicode-range: U+0460-052F, U+20B4, U+2DE0-2DFF, U+A640-A69F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Open Sans'), local('OpenSans'), url(https://fonts.gstatic.com/s/opensans/v13/RjgO7rYTmqiVp7vzi-Q5URJtnKITppOI_IvcXXDNrsc.woff2) format('woff2');
+  unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek-ext */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Open Sans'), local('OpenSans'), url(https://fonts.gstatic.com/s/opensans/v13/LWCjsQkB6EMdfHrEVqA1KRJtnKITppOI_IvcXXDNrsc.woff2) format('woff2');
+  unicode-range: U+1F00-1FFF;
+}
+/* greek */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Open Sans'), local('OpenSans'), url(https://fonts.gstatic.com/s/opensans/v13/xozscpT2726on7jbcb_pAhJtnKITppOI_IvcXXDNrsc.woff2) format('woff2');
+  unicode-range: U+0370-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Open Sans'), local('OpenSans'), url(https://fonts.gstatic.com/s/opensans/v13/59ZRklaO5bWGqF5A9baEERJtnKITppOI_IvcXXDNrsc.woff2) format('woff2');
+  unicode-range: U+0102-0103, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Open Sans'), local('OpenSans'), url(https://fonts.gstatic.com/s/opensans/v13/u-WUoqrET9fUeobQW7jkRRJtnKITppOI_IvcXXDNrsc.woff2) format('woff2');
+  unicode-range: U+0100-024F, U+1E00-1EFF, U+20A0-20AB, U+20AD-20CF, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Open Sans'), local('OpenSans'), url(https://fonts.gstatic.com/s/opensans/v13/cJZKeOuBrn4kERxqtaUH3VtXRa8TVwTICgirnJhmVJw.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2212, U+2215;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 700;
+  src: local('Open Sans Bold'), local('OpenSans-Bold'), url(https://fonts.gstatic.com/s/opensans/v13/k3k702ZOKiLJc3WVjuplzK-j2U0lmluP9RWlSytm3ho.woff2) format('woff2');
+  unicode-range: U+0460-052F, U+20B4, U+2DE0-2DFF, U+A640-A69F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 700;
+  src: local('Open Sans Bold'), local('OpenSans-Bold'), url(https://fonts.gstatic.com/s/opensans/v13/k3k702ZOKiLJc3WVjuplzJX5f-9o1vgP2EXwfjgl7AY.woff2) format('woff2');
+  unicode-range: U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek-ext */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 700;
+  src: local('Open Sans Bold'), local('OpenSans-Bold'), url(https://fonts.gstatic.com/s/opensans/v13/k3k702ZOKiLJc3WVjuplzBWV49_lSm1NYrwo-zkhivY.woff2) format('woff2');
+  unicode-range: U+1F00-1FFF;
+}
+/* greek */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 700;
+  src: local('Open Sans Bold'), local('OpenSans-Bold'), url(https://fonts.gstatic.com/s/opensans/v13/k3k702ZOKiLJc3WVjuplzKaRobkAwv3vxw3jMhVENGA.woff2) format('woff2');
+  unicode-range: U+0370-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 700;
+  src: local('Open Sans Bold'), local('OpenSans-Bold'), url(https://fonts.gstatic.com/s/opensans/v13/k3k702ZOKiLJc3WVjuplzP8zf_FOSsgRmwsS7Aa9k2w.woff2) format('woff2');
+  unicode-range: U+0102-0103, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 700;
+  src: local('Open Sans Bold'), local('OpenSans-Bold'), url(https://fonts.gstatic.com/s/opensans/v13/k3k702ZOKiLJc3WVjuplzD0LW-43aMEzIO6XUTLjad8.woff2) format('woff2');
+  unicode-range: U+0100-024F, U+1E00-1EFF, U+20A0-20AB, U+20AD-20CF, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 700;
+  src: local('Open Sans Bold'), local('OpenSans-Bold'), url(https://fonts.gstatic.com/s/opensans/v13/k3k702ZOKiLJc3WVjuplzOgdm0LZdjqr5-oayXSOefg.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2212, U+2215;
+}
+</style>
+
+  <link rel="stylesheet" href="./Work-Stealing &amp; Recursive Partitioning with Fork_Join - igvita.com_files/A.style.css,q1s3as.pagespeed.cf.dtk_Z6HfGX.css">
+  <style>.hll{background-color:#49483e}.c{color:#75715e}.err{color:#960050;background-color:#1e0010}.k{color:#66d9ef}.l{color:#ae81ff}.n{color:#f8f8f2}.o{color:#f92672}.p{color:#f8f8f2}.cm{color:#75715e}.cp{color:#75715e}.c1{color:#75715e}.cs{color:#75715e}.ge{font-style:italic}.gs{font-weight:bold}.kc{color:#66d9ef}.kd{color:#66d9ef}.kn{color:#f92672}.kp{color:#66d9ef}.kr{color:#66d9ef}.kt{color:#66d9ef}.ld{color:#e6db74}.m{color:#ae81ff}.s{color:#e6db74}.na{color:#a6e22e}.nb{color:#f8f8f2}.nc{color:#a6e22e}.no{color:#66d9ef}.nd{color:#a6e22e}.ni{color:#f8f8f2}.ne{color:#a6e22e}.nf{color:#a6e22e}.nl{color:#f8f8f2}.nn{color:#f8f8f2}.nx{color:#a6e22e}.py{color:#f8f8f2}.nt{color:#f92672}.nv{color:#f8f8f2}.ow{color:#f92672}.w{color:#f8f8f2}.mf{color:#ae81ff}.mh{color:#ae81ff}.mi{color:#ae81ff}.mo{color:#ae81ff}.sb{color:#e6db74}.sc{color:#e6db74}.sd{color:#e6db74}.s2{color:#e6db74}.se{color:#ae81ff}.sh{color:#e6db74}.si{color:#e6db74}.sx{color:#e6db74}.sr{color:#e6db74}.s1{color:#e6db74}.ss{color:#e6db74}.bp{color:#f8f8f2}.vc{color:#f8f8f2}.vg{color:#f8f8f2}.vi{color:#f8f8f2}.il{color:#ae81ff}</style>
+
+  <link rel="manifest" href="https://www.igvita.com/manifest.json">
+  
+  <link rel="icon" sizes="192x192" href="data:image/webp;base64,UklGRhQJAABXRUJQVlA4TAcJAAAvv8AvEIU1atuOza3OCSaanSeobUa17T61bdu2bVtRbdvtDmrb7gSTdibJXOG81/d9z/vsX3utCLi1bbuJ3hKeVEymRRuaSnCVSBWIBmwP410h0IHJXDyfZCfRNhklFS/sufGPbPHPjT0vVJRkhE1BwxFZ5EhDQVjkrEjIJokVOVHMhAuyyoUpUUCbDbLLhjbRFkO+kWG+GRLT0+YTWeaTNjEdW2SaLTEtU2SbOTGVnAuyzY0nYgobZJwtMZkxD2ScB2NiEg2yTkOQcULWOZFRIvOU1Mg8FS/IPC8ckHkOXJF5riRknoT/pb1t6iwPetFIH3jNY660i/khw/3dq4W09ZbNIbN1TjOeFD2iB2T1KmIM0x0yuhOxbod81vueWK0GQDa3IuZ1kM2bifkdZPM94s4CuRxN3GUhl2KvC7kUez3I5TjiLge5/Ji4s0AuBxPzO8jmbsS8GrLZ4G9itVoM8nkssW6CjLb3BDFGaoCcdnU/KXxMb8hrnZ18Ttr82UHqILvtrO50j/vOaDKpyY/ecKWNdYJst1MP/7fxHwtYyprWtrGNrG0pfcyqDjI7r22d6V4faCJttfjOa4Y6155WMwuUpsEw5spQjW62d7tvif+H4YapCAkFYkaofB1DNJEaIqFAzAgVdrCTkaS2SCgQM0Jla/uQ1BoJBWJGqKTBTaT2SCgQM0IFfXxMEkBCgZgR/I2MJSkgoUDMCPaWmkkSSCgQM4K7pmaSBhIKxIxgLqCRJIKEAjEjePWGk1SQUCBmBO8kksgoj0BCgZgRrDn8Q+zfDXKkzaxt0gb2coX3SMVNnnG85XSAlAIxI1hXEneEzbWH6fsYpJX4zV52mlXVQ2qBmBGcWY0jXquTdYC21/En8YY7z7q6QoqBmBGc44jXag8o7Ot3Yp0DiQZiRnDeI97FYGyglTj/mgvSDMSMYCxGvG91BWcQsa6BNAMxIxgHEe9gsBbVSpwxekCSgZgRjCHEGqcBvBeJtRckGYgZwfiGWA+CeSixnoAkAzEjFDcQ73AwBxCrST2kGIgZobgP8VYDs4MWYi0LKQZiRihej3izgvsZsfaEFAMxIxRvR6yJ2oP7IrFOhxQDMSMU70+sRrAfIdYNkGIgZoTi/Yn1I9gDiTUQUgzEjFC8P7F+BHsgsQZCioGYEYp3IlYj2A8TayCkGIgZoXgT4nUE91ViXQ0pBmJGKF6GePOC+w2xTocUAzEjFPcm3sZgdtNKrH0gxUDMCMZvxDoXzDWJtxqkGIgZwXicWO+CeT6xWvWCFAMxIxgnEm9xsNr5mlifQJKBmBGMJYl3K1hbEO8aSDIQM4JR52tiTbQMGPU+It56kGQgZgTndOJ9JEDxecT7XntIMhAzgjO7ZuI9rwGK9tJKvLMhzUDMCNZNxHxXP2izi0u0Em+cWSHNQMwI1hyaiDneXVbTHqad0zF+IO4FkGggZgTveOKP9qLbXOo813vYl8T/XW9INBAzgtfBf0ntdoBUAzEjmPP5m9TqVkg2EDOCu6ZmUps3dYFkAzEj2NtoIbV4z4yQbiBmBH9jY0j1R5gJEg7EjFBBHx+Taj+kAVIOxIxQSReXGU+q2ewYdZB0IGaEyhZzj4mkam/oD4kHYkaosI8PSJW+tb06SD0QM0JFnZyjhVRnuJ3UQ/qBmBEqWcQIUpU/3GAVKEUgZoQKttNEKh/nZWdaVXsoSSBmBP8kraToAdd51Pt+MoZM86v3PetOZ9hBfx2hRIGYEewzSeFZ6mBqnZ4mBShlIGYE9xBSeAOUPRAzgtlfCyn6UTcoeyBmBPNZUngalD4QM4LXjxRvDKUPxIzgnUCKl4XSB2JG8J4kxftB6QMxI3jfkeIfzQ9lD8SM4I0hxm/2UQ/lDsSM4I0i1p/usLul9IDyBmJG8D4jfpPvfekDwxS95RlPutMljrGlxdRD2oGYEbyHSU1a/Ncl1tcR0g3EjODtT2r2l1stC6kGYkbwehhDavi69SHNQMwI5mmkpk+YF1IMxIxgdvIBqWmj7SDBQMwIbl+NpLZnQHqBmBHsdTST2l4GyQViRvDXMprU9hhILRAzQgWLGkZqOsFqkFggZoRKOtrPd6SWX+oMaQViRqhgUcd7QTOp6dGQViBmBLeXw71Pav6LLpBUIGYEb1aXaSIp7AlJBWJGcDo50RiSxtOQVCBmBKOv90gqE/SClAIxIxRvbSxJZyNIqZ35mF2hcC8TSUJnQwm30krMH93jOJtYTX/zaXNhS5m0lq0c7GxDfWoi8R+B8vXRRKx/3GpVdVBBd1sYrImY70PpOhhJrEHmgIpncivxfofSHUCcJttBVU4g1hgoW72fiNFkFajSY8RC2XYkzh5QrRWJhbI9SIxXoGp1GokxHkpWbxwxNoPqDSPGL1CyZYgxXheo3hvEeBdKthMxPoYqfkaMB6BkJxHjVaheMIEYZ0HJziXGO1C9vYizBZTscmKM1R6q1cnnxJioN5TsLOKsCdW6ljhvQtmOIc7jUKVTiXUElG0HYu0O1ejhJmI1mxHKNoBYzTaFiuvs4mfi3Qql6+RfYk10tk5QUXube4OY4y0I5XuUmF/bUxdwO1jRxb4n9uVQwn2J/ZdbbWNWKGpnXhs42SMaSQXfC1DCHhpJJT97we0uca5jHeJYk45znmsN9JJP/UsqnGAtKOWFJJ2ToZwz+J2kcqs6KOkuJJGB2kNZ69xFkrhaeyhvF2+S2v/jICh1T6+TWn9qAJS8m8dITce7WAOUvs6xWkjtnrEYZGFpw0mNXrMB5KKdPXxNqj/OIMtDTjra0eukqhM9azcBsrOg03xMqvSLIXYzM2RqAfu600cmkIr+9oKL7GQRyFyDFe3hDHd4xcd+NZ601ehbIzzuNqfbyxrmhKx219Ns5jN5bj1N6g6pkZB5EldknisHZJ4DL8g8L9TIPBXPyDwlGSdknRMZQYOs0xCTKEjIOImCmMwKGWdDTCHnimxzJSemMkO2WRDTskWm2RHT0eUTWeaTLjE9Q/6QYX4YEm3RYYvssqVDFDDjgqxyYU4UM2JDQjZJbBgRFgVLzsgiZ5YUhE1GSc0Le+48kC0e3NnzQk1JRrQNAA==">
+  <meta name="theme-color" content="#000">
+
+  <meta name="author" content="Ilya Grigorik">
+  <meta name="twitter:card" content="summary">
+  
+    <meta name="description" content="JDK7&#39;s Fork/Join combines a double ended queue (deque) and a recursive job partitioning step to minimize synchronization - a great design pattern to keep in mind for single host and distributed cases!">
+    <meta name="twitter:description" content="JDK7&#39;s Fork/Join combines a double ended queue (deque) and a recursive job partitioning step to minimize synchronization - a great design pattern to keep in mind for single host and distributed cases!">
+  
+  
+    <meta property="og:image" content="http://www.igvita.com/posts/12/duke.png">
+    <meta name="twitter:image:src" content="http://www.igvita.com/posts/12/duke.png">
+  
+
+  <meta name="twitter:creator" content="@igrigorik">
+  <meta name="twitter:url" content="https://www.igvita.com/2012/02/29/work-stealing-and-recursive-partitioning-with-fork-join/">
+  <meta name="twitter:title" content="Work-Stealing &amp; Recursive Partitioning with Fork/Join">
+  <meta property="twitter:account_id" content="9980812">
+
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+
+  <link rel="alternate" type="application/rss+xml" title="igvita.com RSS Feed" href="https://www.igvita.com/feed/">
+  <link rel="canonical" href="https://www.igvita.com/2012/02/29/work-stealing-and-recursive-partitioning-with-fork-join/">
+
+  
+<script src="./Work-Stealing &amp; Recursive Partitioning with Fork_Join - igvita.com_files/saved_resource"></script><script src="./Work-Stealing &amp; Recursive Partitioning with Fork_Join - igvita.com_files/count-data.js.下载"></script></head>
+
+<body>
+
+<div id="container">
+  <header>
+    <div class="content">
+      <a href="https://www.igvita.com/">igvita.com</a> <b>&nbsp;|&nbsp;</b> <span>a goal is a dream with a deadline</span>
+      <a href="https://www.igvita.com/" class="about">about</a>
+    </div>
+  </header>
+
+  <div id="main" role="main">
+  <div id="post" class="content" itemscope="" itemtype="http://schema.org/Article">
+  <h1 itemprop="name">Work-Stealing &amp; Recursive Partitioning with Fork/Join</h1>
+  <p class="byline">By <a href="https://www.igvita.com/" rel="author" itemprop="author">Ilya Grigorik</a> on <b itemprop="datePublished" datetime="2012-02-29">February 29, 2012</b></p>
+
+  <p><script data-pagespeed-no-defer="">(function(){var g=this;function h(b,d){var a=b.split("."),c=g;a[0]in c||!c.execScript||c.execScript("var "+a[0]);for(var e;a.length&&(e=a.shift());)a.length||void 0===d?c[e]?c=c[e]:c=c[e]={}:c[e]=d};function l(b){var d=b.length;if(0<d){for(var a=Array(d),c=0;c<d;c++)a[c]=b[c];return a}return[]};function m(b){var d=window;if(d.addEventListener)d.addEventListener("load",b,!1);else if(d.attachEvent)d.attachEvent("onload",b);else{var a=d.onload;d.onload=function(){b.call(this);a&&a.call(this)}}};var n;function p(b,d,a,c,e){this.h=b;this.j=d;this.l=a;this.f=e;this.g={height:window.innerHeight||document.documentElement.clientHeight||document.body.clientHeight,width:window.innerWidth||document.documentElement.clientWidth||document.body.clientWidth};this.i=c;this.b={};this.a=[];this.c={}}function q(b,d){var a,c,e=d.getAttribute("data-pagespeed-url-hash");if(a=e&&!(e in b.c))if(0>=d.offsetWidth&&0>=d.offsetHeight)a=!1;else{c=d.getBoundingClientRect();var f=document.body;a=c.top+("pageYOffset"in window?window.pageYOffset:(document.documentElement||f.parentNode||f).scrollTop);c=c.left+("pageXOffset"in window?window.pageXOffset:(document.documentElement||f.parentNode||f).scrollLeft);f=a.toString()+","+c;b.b.hasOwnProperty(f)?a=!1:(b.b[f]=!0,a=a<=b.g.height&&c<=b.g.width)}a&&(b.a.push(e),b.c[e]=!0)}p.prototype.checkImageForCriticality=function(b){b.getBoundingClientRect&&q(this,b)};h("pagespeed.CriticalImages.checkImageForCriticality",function(b){n.checkImageForCriticality(b)});h("pagespeed.CriticalImages.checkCriticalImages",function(){r(n)});function r(b){b.b={};for(var d=["IMG","INPUT"],a=[],c=0;c<d.length;++c)a=a.concat(l(document.getElementsByTagName(d[c])));if(0!=a.length&&a[0].getBoundingClientRect){for(c=0;d=a[c];++c)q(b,d);a="oh="+b.l;b.f&&(a+="&n="+b.f);if(d=0!=b.a.length)for(a+="&ci="+encodeURIComponent(b.a[0]),c=1;c<b.a.length;++c){var e=","+encodeURIComponent(b.a[c]);131072>=a.length+e.length&&(a+=e)}b.i&&(e="&rd="+encodeURIComponent(JSON.stringify(t())),131072>=a.length+e.length&&(a+=e),d=!0);u=a;if(d){c=b.h;b=b.j;var f;if(window.XMLHttpRequest)f=new XMLHttpRequest;else if(window.ActiveXObject)try{f=new ActiveXObject("Msxml2.XMLHTTP")}catch(k){try{f=new ActiveXObject("Microsoft.XMLHTTP")}catch(v){}}f&&(f.open("POST",c+(-1==c.indexOf("?")?"?":"&")+"url="+encodeURIComponent(b)),f.setRequestHeader("Content-Type","application/x-www-form-urlencoded"),f.send(a))}}}function t(){var b={},d=document.getElementsByTagName("IMG");if(0==d.length)return{};var a=d[0];if(!("naturalWidth"in a&&"naturalHeight"in a))return{};for(var c=0;a=d[c];++c){var e=a.getAttribute("data-pagespeed-url-hash");e&&(!(e in b)&&0<a.width&&0<a.height&&0<a.naturalWidth&&0<a.naturalHeight||e in b&&a.width>=b[e].o&&a.height>=b[e].m)&&(b[e]={rw:a.width,rh:a.height,ow:a.naturalWidth,oh:a.naturalHeight})}return b}var u="";h("pagespeed.CriticalImages.getBeaconData",function(){return u});h("pagespeed.CriticalImages.Run",function(b,d,a,c,e,f){var k=new p(b,d,a,e,f);n=k;c&&m(function(){window.setTimeout(function(){r(k)},0)})});})();pagespeed.CriticalImages.Run('/ngx_pagespeed_beacon','https://www.igvita.com/2012/02/29/work-stealing-and-recursive-partitioning-with-fork-join/','XwPRccgygX',true,false,'ciL5ehleprA');</script><img src="data:image/webp;base64,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" class="left" data-pagespeed-url-hash="2806458656" onload="pagespeed.CriticalImages.checkImageForCriticality(this);">Implementing an efficient parallel algorithm is, unfortunately, still a non-trivial task in most languages: we need to determine how to partition the problem, determine the optimal level of parallelism, and finally build an implementation with minimal synchronization. This last bit is especially critical since as <a href="http://en.wikipedia.org/wiki/Amdahl&#39;s_law">Amdahl's law</a> tells us: <strong>"the speedup of a program using multiple processors in parallel computing is limited by the time needed for the sequential fraction of the program".</strong></p>
+
+<p>The Fork/Join framework (<a href="http://jcp.org/en/jsr/detail?id=166">JSR 166</a>) in <a href="http://openjdk.java.net/projects/jdk7/features/">JDK7</a> implements a clever work-stealing technique for parallel execution that is worth learning about - even if you are not a JDK user. Optimized for parallelizing <a href="http://en.wikipedia.org/wiki/Divide_and_conquer_algorithm">divide-and-conquer</a> (and <a href="http://en.wikipedia.org/wiki/MapReduce#Logical_view">map-reduce</a>) algorithms it abstracts all the CPU scheduling and work balancing behind a simple to use API.</p>
+
+<h2>Load Balancing vs. Synchronization</h2>
+
+<p>One of the key challenges in parallelizing any type of workload is the partitioning step: ideally we want to partition the work such that every piece will take the exact same amount of time. In reality, we often have to guess at what the partition should be, which means that some parts of the problem will take longer, either because of the inefficient partitioning scheme, or due to some other, unanticipated reasons (e.g. external service, slow disk access, etc).</p>
+
+<p>This is where <a href="http://en.wikipedia.org/wiki/Cilk#Work-stealing">work-stealing</a> comes in. If some of the CPU cores finish their jobs early, then we want them to help to finish the problem. However, now we have to be careful: trying to "steal" work from another worker will require synchronization, which will slowdown the processing. Hence, <strong>we want work-stealing, but with minimal synchronization</strong> - think back to <a href="http://en.wikipedia.org/wiki/Amdahl&#39;s_law">Amdahl's law</a>.</p>
+
+<h2>Fork/Join Work-Stealing</h2>
+
+<p>The <a href="http://gee.cs.oswego.edu/dl/papers/fj.pdf">Fork-Join framework</a> (<a href="http://docs.oracle.com/javase/tutorial/essential/concurrency/forkjoin.html">docs</a>) solves this problem in a clever way: recursive job partitioning, and a <a href="http://en.wikipedia.org/wiki/Double-ended_queue">double-ended queue</a> (<strong>deque</strong>) structure for holding the tasks.</p>
+
+<p><img src="./Work-Stealing &amp; Recursive Partitioning with Fork_Join - igvita.com_files/xwork-stealing.png.pagespeed.ic.iTkWB_3KHR.webp" class="center" data-pagespeed-url-hash="4118241220" onload="pagespeed.CriticalImages.checkImageForCriticality(this);"></p>
+
+<p>Given a problem, we divide the problem into N large pieces, and hand each piece to one of the workers (2 in the diagram above). Each worker then recursively subdivides the first problem at the head of the deque and appends the split tasks to the head of the same deque. After a few iterations we will end up with some number of smaller tasks at the front of the deque, and a few larger and yet to be partitioned tasks on end. So far so good, but what do we get?</p>
+
+<p>Imagine the second worker has finished all of its work, while the first worker is busy. To minimize synchronization the second worker grabs a job from <strong>the end</strong> of the deque (hence the reason for efficient head and tail access). By doing so, it will get the largest available block of work, allowing it to minimize the number of times it has to interact with the other worker (aka, minimize synchronization). Simple, but a very clever technique!</p>
+
+<h2>Fork-Join in Practice (JRuby)</h2>
+
+<p>It is important to understand why and how the Fork/Join framework works under the hood, but the best part is that the API presented to the developer completely abstracts all of these details. The runtime can and will determine the level of parallelism, as well as handle all the work of balancing tasks across the available workers:</p>
+
+<div class="highlight"><pre><code class="language-ruby" data-lang="ruby"><span class="nb">require</span> <span class="s1">'forkjoin'</span>
+
+<span class="k">class</span> <span class="nc">Fibonacci</span> <span class="o">&lt;</span> <span class="no">ForkJoin</span><span class="o">::</span><span class="no">Task</span>
+  <span class="k">def</span> <span class="nf">initialize</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+    <span class="vi">@n</span> <span class="o">=</span> <span class="n">n</span>
+  <span class="k">end</span>
+
+  <span class="k">def</span> <span class="nf">call</span>
+    <span class="k">return</span> <span class="vi">@n</span> <span class="k">if</span> <span class="vi">@n</span> <span class="o">&lt;=</span> <span class="mi">1</span>
+
+    <span class="p">(</span><span class="n">f</span> <span class="o">=</span> <span class="no">Fibonacci</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="vi">@n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">fork</span>
+    <span class="no">Fibonacci</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="vi">@n</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">call</span> <span class="o">+</span> <span class="n">f</span><span class="o">.</span><span class="n">join</span>
+  <span class="k">end</span>
+<span class="k">end</span>
+
+<span class="n">n</span> <span class="o">=</span> <span class="no">ARGV</span><span class="o">.</span><span class="n">shift</span><span class="o">.</span><span class="n">to_i</span>
+<span class="n">pool</span> <span class="o">=</span> <span class="no">ForkJoin</span><span class="o">::</span><span class="no">Pool</span><span class="o">.</span><span class="n">new</span> <span class="c1"># 2,4,8, ...</span>
+
+<span class="nb">puts</span> <span class="s2">"fib(</span><span class="si">#{</span><span class="n">n</span><span class="si">}</span><span class="s2">) = </span><span class="si">#{</span><span class="n">pool</span><span class="o">.</span><span class="n">invoke</span><span class="p">(</span><span class="no">Fibonacci</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">n</span><span class="p">))</span><span class="si">}</span><span class="s2">, parallelism = </span><span class="si">#{</span><span class="n">pool</span><span class="o">.</span><span class="n">parallelism</span><span class="si">}</span><span class="s2">"</span>
+
+<span class="c1"># $&gt; ruby fib.rb 33</span></code></pre></div>
+
+
+<p>The <a href="https://github.com/headius/forkjoin.rb">JRuby forkjoin gem</a> is a simple wrapper for the Java API. In the example above, we instatiate a <code>ForkJoin::Pool</code> and call <code>invoke</code> passing it our Fibonacci problem. The Fibonacci problem is type of <code>ForkJoin::Task</code>, which implements a recursive <code>call</code> method: if the problem is "too big", then we split it into two parts, one of which is "forked" (pushed onto the head of the deque), and the second half we invoke immediately. The final answer is the sum of the two tasks.</p>
+
+<p>By default, the <code>ForkJoin::Pool</code> will allocate the same number of threads as available CPU cores - in my case, that happens to be 2, but the code above will automatically scale up to the number of available cores! Copy the code, run it, and you will see all of your available resources light up under load.</p>
+
+<h2>Map-Reduce and Fork-Join</h2>
+
+<p>The recursion of the divide-and-conquer technique is what enables the efficient deque work-stealing. However, it is interesting to note that the <strong>"map-reduce" workflow is simply a special case of this pattern</strong>. Instead of recursively partitioning the problem, the map-reduce algorithm will subdivide the problem upfront. This, in turn, means that in the case of an unbalanced workload we are likely to steal finer-grained tasks, which will also lead to more need for synchronization - if you can partition the problem recursively, do so!</p>
+
+<div class="highlight"><pre><code class="language-ruby" data-lang="ruby"><span class="nb">require</span> <span class="s1">'zlib'</span>
+<span class="nb">require</span> <span class="s1">'forkjoin'</span>
+<span class="nb">require</span> <span class="s1">'archive/tar/minitar'</span>
+
+<span class="n">pool</span> <span class="o">=</span> <span class="no">ForkJoin</span><span class="o">::</span><span class="no">Pool</span><span class="o">.</span><span class="n">new</span>
+
+<span class="n">jobs</span> <span class="o">=</span> <span class="no">Dir</span><span class="o">[</span><span class="no">ARGV</span><span class="o">[</span><span class="mi">0</span><span class="o">].</span><span class="n">chomp</span><span class="p">(</span><span class="s1">'/'</span><span class="p">)</span> <span class="o">+</span> <span class="s1">'/*'</span><span class="o">].</span><span class="n">map</span> <span class="k">do</span> <span class="o">|</span><span class="n">dir</span><span class="o">|</span>
+  <span class="no">Proc</span><span class="o">.</span><span class="n">new</span> <span class="k">do</span>
+    <span class="nb">puts</span> <span class="s2">"Threads: </span><span class="si">#{</span><span class="n">pool</span><span class="o">.</span><span class="n">active_thread_count</span><span class="si">}</span><span class="s2">, </span><span class="si">#{</span><span class="no">Thread</span><span class="o">.</span><span class="n">current</span><span class="si">}</span><span class="s2"> processing: </span><span class="si">#{</span><span class="n">dir</span><span class="si">}</span><span class="s2">"</span>
+
+    <span class="n">backup</span> <span class="o">=</span> <span class="s2">"/tmp/backup/</span><span class="si">#{</span><span class="no">File</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">dir</span><span class="p">)</span><span class="si">}</span><span class="s2">.tgz"</span>
+    <span class="n">tgz</span> <span class="o">=</span> <span class="no">Zlib</span><span class="o">::</span><span class="no">GzipWriter</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="no">File</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">backup</span><span class="p">,</span> <span class="s1">'wb'</span><span class="p">))</span>
+    <span class="no">Archive</span><span class="o">::</span><span class="no">Tar</span><span class="o">::</span><span class="no">Minitar</span><span class="o">.</span><span class="n">pack</span><span class="p">(</span><span class="n">dir</span><span class="p">,</span> <span class="n">tgz</span><span class="p">)</span>
+
+    <span class="no">File</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="n">backup</span><span class="p">)</span>
+  <span class="k">end</span>
+<span class="k">end</span>
+
+<span class="n">results</span> <span class="o">=</span> <span class="n">pool</span><span class="o">.</span><span class="n">invoke_all</span><span class="p">(</span><span class="n">jobs</span><span class="p">)</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="o">&amp;</span><span class="ss">:get</span><span class="p">)</span>
+<span class="nb">puts</span> <span class="s2">"Created </span><span class="si">#{</span><span class="n">results</span><span class="o">.</span><span class="n">size</span><span class="si">}</span><span class="s2"> backup archives, total bytes: </span><span class="si">#{</span><span class="n">results</span><span class="o">.</span><span class="n">reduce</span><span class="p">(</span><span class="ss">:+</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+
+<span class="c1"># $&gt; ruby backup.rb /home/igrigorik/</span></code></pre></div>
+
+
+<p>The above is a simple, map-reduce example via the same API. Given a path, this program will iterate over all files and folders, create all the backup tasks upfront, and finally invoke them to create the backup archives. Best of all, there is no threadpool management or synchronization code to be seen and the framework will easily pin all of your available cores, as well as automatically balance the work between all of the workers.</p>
+
+<h2>Parallel Java &amp; Distributed Work-Stealing</h2>
+
+<p>The Fork/Join framework is deceivingly simple on the surface, but as usual, the <a href="http://cs.oswego.edu/pipermail/concurrency-interest/2012-January/008987.html">devil is in the details</a> when it comes to optimizing for performance. However, regardless of whether you are a JDK user or not, <strong>the deque, combined with a recursive partitioning step is a great pattern to keep in mind</strong>. The JDK implementation is built for "within single JVM" workloads, but a similar pattern can be just as useful in many distributed cases.</p>
+
+
+  <div class="author-callout">
+    <img src="data:image/webp;base64,UklGRkABAABXRUJQVlA4IDQBAACQBwCdASojACMAPm0sk0WkIqGY7M0AQAbEtIACimd5LwNhb1mmMhaemgd/9MsXcT04KxSkF9TgmxcVs3qi9pt9idTWiAAA/v0BSccs2Wslieu639ZzsnAqMw2Kt9aHa6taGUneSS3W3lot0I1v46dsp/Kb3zhlAY0xw88Sa7Qza0rN9FBXD7+ZMUUycl1Avh9tLShWimybukziNKH+3J3IGYAbiEAeatj+TGz/9BB120CzpM7Iavw4sX75hCG3STx5czWirHmauIxOdTCB8oWhrF01o48i4f5+iRRyj4swZ4pO8E8yhvuA5vu4q88HDgwLEd77r6uPyLFTJoMViFSYkyGbl7bitKwK8ALeKh6V6rv0F5w5yrrpb1vQSHGt9yd25ko2Fn8WH+p8NNDWKMeVsAAAAA==" alt="Ilya Grigorik" data-pagespeed-url-hash="3389108481" onload="pagespeed.CriticalImages.checkImageForCriticality(this);"><strong>Ilya Grigorik</strong> is a web performance engineer at Google, co-chair of the W3C Web Performance working group, and author of High Performance Browser Networking (O'Reilly) book — follow on <a href="https://twitter.com/igrigorik">Twitter</a>, <a href="https://plus.google.com/+IlyaGrigorik">Google+</a>.
+  </div>
+
+  <div class="content social">
+    <a href="http://www.igvita.com/2012/02/29/work-stealing-and-recursive-partitioning-with-fork-join/#disqus_thread" onclick="return loadDisqus()">View comments (12)</a>, share on <a href="https://twitter.com/share?url=http://www.igvita.com/2012/02/29/work-stealing-and-recursive-partitioning-with-fork-join/&amp;text=Work-Stealing+%26+Recursive+Partitioning+with+Fork%2FJoin:&amp;via=igrigorik" target="_blank">Twitter</a><span id="twittercount"></span>, <a href="https://plus.google.com/share?url=http://www.igvita.com/2012/02/29/work-stealing-and-recursive-partitioning-with-fork-join/" target="_blank">Google+</a><span id="gpluscount"> (25)</span><span id="fbcount">, <a href="https://www.facebook.com/sharer/sharer.php?u=http://www.igvita.com/2012/02/29/work-stealing-and-recursive-partitioning-with-fork-join/" target="_blank">Facebook</a> (5)</span>.
+  </div>
+</div>
+
+<div id="comments" class="content">
+    <div id="disqus_thread"></div>
+  </div>
+</div>
+
+<div id="meta">
+  <div class="group book">
+    <div class="book-cover" style="margin-top:0.2em"></div>
+
+    <h3 style="color: #fff">High Performance Browser Networking - O'Reilly</h3>
+    <p style="font-style:italic">What every web developer needs to know about the various types of networks (WiFi, 3G/4G), transport protocols (UDP, TCP, and TLS), application protocols (HTTP/1.1, HTTP/2), and APIs available in the browser (XHR &amp; Fetch, WebSocket, WebRTC, and more) to deliver the best—fast, reliable, and resilient—user experience.</p>
+
+    <p style="padding-top:0.5em"><a href="https://hpbn.co/?utm_source=igvita&amp;utm_medium=referral&amp;utm_campaign=igvita-footer" style="text-decoration:none;"><span class="button">Read at hpbn.co (free)</span></a></p>
+  </div>
+</div>
+
+<script>var disqus_url='http://www.igvita.com/2012/02/29/work-stealing-and-recursive-partitioning-with-fork-join/';var disqus_shortname='igvita';var loadDisqus=function(){var dsq=document.createElement('script');dsq.type='text/javascript';dsq.async=true;dsq.src='//igvita.disqus.com/embed.js';(document.getElementsByTagName('head')[0]||document.getElementsByTagName('body')[0]).appendChild(dsq);return false;};function social_counts(data){var twc=document.getElementById('twittercount'),gwc=document.getElementById('gpluscount'),fwc=document.getElementById('fbcount');if(data['Twitter']>0){twc.innerText=' ('+data['Twitter']+')'}if(data['GooglePlusOne']>0){gwc.innerText=' ('+data['GooglePlusOne']+')'}if(data['Facebook']['total_count']>0){fwc.innerHTML=", <a href='https://www.facebook.com/sharer/sharer.php?u=http://www.igvita.com/2012/02/29/work-stealing-and-recursive-partitioning-with-fork-join/' target='_blank'>Facebook</a>"+' ('+data['Facebook']['total_count']+')';}}var scount=document.createElement('script');scount.src="//free.sharedcount.com/?callback=social_counts&url=http://www.igvita.com/2012/02/29/work-stealing-and-recursive-partitioning-with-fork-join/&apikey=3e1fc0ba6af5530d504d4cc95d73309978520066"
+document.getElementsByTagName('head')[0].appendChild(scount);</script>
+<script src="./Work-Stealing &amp; Recursive Partitioning with Fork_Join - igvita.com_files/count.js.下载" async=""></script>
+
+
+
+
+  <footer>
+    <div id="copyright">
+      <div class="group">
+        <span>© Ilya Grigorik</span>
+        <a href="https://www.igvita.com/" class="about">about</a><a href="http://feeds.igvita.com/igvita" class="about rss">subscribe via rss</a>
+      </div>
+    </div>
+  </footer>
+</div> 
+
+
+</body></html>

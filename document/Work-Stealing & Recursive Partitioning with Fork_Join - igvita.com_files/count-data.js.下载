@@ -1,0 +1,5 @@
+var DISQUSWIDGETS;
+
+if (typeof DISQUSWIDGETS != 'undefined') {
+    DISQUSWIDGETS.displayCount({"text":{"and":"and","comments":{"zero":"Leave a comment","multiple":"View comments ({num})","one":"View comments (1)"}},"counts":[{"id":"http:\/\/www.igvita.com\/2012\/02\/29\/work-stealing-and-recursive-partitioning-with-fork-join\/","comments":12}]});
+}
